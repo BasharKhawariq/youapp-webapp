@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { IoIosArrowBack } from "react-icons/io";
 import Link from "next/link";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import Loader from "@/components/loader";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -51,7 +52,12 @@ export default function Login() {
     !form.watch("email") || !form.watch("password") || isLoading;
 
   return (
-    <div className="h-screen w-screen bg-gradient-to-tr from-[#09141A] via-[#0D1D23] to-[#1F4247] text-white">
+    <div className="relative h-screen w-screen bg-gradient-to-tr from-[#09141A] via-[#0D1D23] to-[#1F4247] text-white">
+      {isLoading && (
+        <div className="absolute inset-0 flex justify-center items-center bg-black bg-opacity-30 z-50">
+          <Loader /> {/* Komponen loader */}
+        </div>
+      )}
       <div className="h-full w-full flex flex-col">
         <div className="flex flex-row items-center justify-items-start gap-1 pl-5 pt-20">
           <Link href="/" className="flex flex-row items-center gap-1">
@@ -107,7 +113,7 @@ export default function Login() {
 
             {/* Display success alert */}
             {SuccessMessage && (
-              <div className="fixed top-12 right-10 z-50 bg-green-500 text-white rounded-lg shadow-lg p-4 flex items-center gap-3">
+              <div className="fixed top-12 right-10 z-40 bg-green-500 text-white rounded-lg shadow-lg p-4 flex items-center gap-3">
                 <div>
                   <AlertTitle className="font-semibold">Success</AlertTitle>
                   <AlertDescription className="text-sm">
@@ -132,7 +138,7 @@ export default function Login() {
               }`}
               disabled={isButtonDisabled}
             >
-              {isLoading ? "Logging in..." : "Login"}
+              Login
             </Button>
           </form>
 

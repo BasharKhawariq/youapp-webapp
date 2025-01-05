@@ -91,29 +91,45 @@ const useAuthStore = create((set) => ({
   },
 
   // Update profile function
-  async updateProfile(about) {
+  updateProfile: async (userData) => {
+    set({
+      isLoading: true,
+      ErrorMessage: null,
+      SuccessMessage: null,
+    });
+
+    const token = Cookies.get("token");
+
+    if (!token) {
+      set({ ErrorMessage: "No token found. Please log in again." });
+      return;
+    }
+
     try {
-      const response = await axios.post(
-        "https://techtest.youapp.ai/api/createProfile", // API untuk pembaruan profil
-        {
-          name: this.user?.name || "",
-          birthday: this.user?.birthday || "",
-          height: this.user?.height || 0,
-          weight: this.user?.weight || 0,
-          about: about,
-        },
+      const response = await axios.put(
+        "https://techtest.youapp.ai/api/updateProfile",
+        userData,
         {
           headers: {
-            Authorization: `Bearer ${this.token}`, // pastikan token disertakan
+            "x-access-token": token,
           },
         }
       );
-      console.log("Profile updated:", response.data);
-      this.user = { ...this.user, about }; // Menyimpan data terbaru ke state user
-      return response.data; // Bisa menambahkan return untuk feedback
+
+      const result = response.data;
+
+      if (response.status === 200) {
+        set({
+          user: result.data,
+          SuccessMessage: "Profile updated successfully.",
+        });
+      } else {
+        set({ ErrorMessage: result.message || "Failed to update profile." });
+      }
     } catch (error) {
-      console.error("Error updating profile", error);
-      throw error;
+      set({ ErrorMessage: "Error updating profile. Please try again later." });
+    } finally {
+      set({ isLoading: false });
     }
   },
 }));
