@@ -50,6 +50,7 @@ export default function Register() {
   });
 
   const [showPassword, setShowPassword] = useState(false); // State for toggling password visibility
+  const [showPassword2nd, setShowPassword2nd] = useState(false); // State for toggling password visibility
   const [loading, setLoading] = useState(false);
 
   async function handleRegister(data) {
@@ -175,16 +176,16 @@ export default function Register() {
                     <FormControl>
                       <div className="relative">
                         <Input
-                          type={showPassword ? "text" : "password"}
+                          type={showPassword2nd ? "text" : "password"}
                           placeholder="Confirm Password"
                           className="bg-[#1A2B32] border border-[#30444E] rounded-md h-12 text-lg px-4"
                           {...field}
                         />
                         <span
                           className="absolute inset-y-0 right-3 flex items-center text-xl text-gray-400 cursor-pointer"
-                          onClick={() => setShowPassword(!showPassword)}
+                          onClick={() => setShowPassword2nd(!showPassword2nd)}
                         >
-                          {showPassword ? <FaEye /> : <FaEyeSlash />}
+                          {showPassword2nd ? <FaEye /> : <FaEyeSlash />}
                         </span>
                       </div>
                     </FormControl>

@@ -85,8 +85,52 @@ const useAuthStore = create((set) => ({
       } else {
         set({ ErrorMessage: "Failed to fetch profile." });
       }
+      return response.data.data;
     } catch (error) {
       set({ ErrorMessage: "Error fetching profile. Please try again later." });
+    }
+  },
+
+  // Update profile function
+  createProfile: async (userData) => {
+    set({
+      isLoading: true,
+      ErrorMessage: null,
+      SuccessMessage: null,
+    });
+
+    const token = Cookies.get("token");
+
+    if (!token) {
+      set({ ErrorMessage: "No token found. Please log in again." });
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        "https://techtest.youapp.ai/api/createProfile",
+        userData,
+        {
+          headers: {
+            "x-access-token": token,
+          },
+        }
+      );
+
+      const result = response.data;
+
+      if (response.status === 200) {
+        set({
+          user: result.data,
+          SuccessMessage: "Profile updated successfully.",
+        });
+      } else {
+        set({ ErrorMessage: result.message || "Failed to update profile." });
+      }
+    } catch (error) {
+      set({ ErrorMessage: "Error updating profile. Please try again later." });
+    } finally {
+      set({ isLoading: false });
     }
   },
 

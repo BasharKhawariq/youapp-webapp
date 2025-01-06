@@ -25,7 +25,6 @@ import { Input } from "@/components/ui/input"; // Shadcn Input component
 import { Label } from "@/components/ui/label";
 import Loader from "@/components/loader";
 import Link from "next/link";
-import axios from "axios";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -83,15 +82,12 @@ const profileSchema = z.object({
     .string()
     .transform((val) => parseInt(val, 10))
     .refine((val) => val > 0, "Weight must be positive"),
-  interests: z
-    .string()
-    .min(1, "Interests are required")
-    .transform((val) => val.split(",").map((item) => item.trim())), // Mengumpulkan string jadi array
+  interests: z.array(),
   gender: z.string("Gender is required"),
 });
 
 export default function Profile() {
-  const { fetchProfile, user, updateProfile } = useAuthStore(); // Ambil updateProfile dari authstore
+  const { fetchProfile, user, createProfile, updateProfile } = useAuthStore(); // Ambil createProfile dari authstore
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState(null);
   const [isEditingAbout, setIsEditingAbout] = useState(false);
@@ -110,10 +106,27 @@ export default function Profile() {
       birthday: user?.birthday || "",
       height: user?.height?.toString() || "",
       weight: user?.weight?.toString() || "",
-      interests: user?.interests?.join(", ") || "",
+      interests: user?.interests?.join(", ") || [],
       gender: user?.gender || "", // Menambahkan gender
     },
   });
+
+  // Fungsi untuk menghitung umur berdasarkan tanggal lahir
+  const getAge = (birthday) => {
+    const birthDate = new Date(birthday.split(" ").reverse().join("-")); // Format ke YYYY-MM-DD
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    // Jika bulan dan hari belum lewat, kurangi 1 tahun
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+    return age;
+  };
 
   const getProfile = async () => {
     try {
@@ -123,8 +136,10 @@ export default function Profile() {
         birthday: user?.birthday || "",
         height: user?.height?.toString() || "",
         weight: user?.weight?.toString() || "",
-        interests: user?.interests?.join(", ") || "",
+        interests: user?.interests?.join(", ") || [],
         gender: user?.gender || "", // Reset gender
+        horoscope: user?.horoscope || "", // Menambahkan horoscope
+        zodiac: user?.zodiac || "", // Menambahkan horoscope
       });
     } catch (error) {
       setProfileError(
@@ -137,7 +152,7 @@ export default function Profile() {
 
   useEffect(() => {
     getProfile();
-  }, []);
+  }, [isEditingAbout]);
 
   const handleSaveAbout = async (data) => {
     try {
@@ -145,19 +160,33 @@ export default function Profile() {
       // Menghitung Zodiac dan Horoscope berdasarkan tanggal lahir
       const zodiac = getZodiac(data.birthday);
       const horoscope = zodiac ? `${zodiac} horoscope` : "";
-      
+
       console.log(zodiac, horoscope);
-      // Memanggil updateProfile dari store untuk update profil
-      await updateProfile({
-        name: data.name,
-        birthday: data.birthday,
-        height: parseInt(data.height),
-        weight: parseInt(data.weight),
-        interests: data.interests,
-        gender: data.gender, // Menyertakan gender
-        zodiac: zodiac, // Menyertakan zodiac
-        horoscope: horoscope, // Menyertakan horoscope
-      });
+      console.log(user, "user");
+      // Memanggil api dari store untuk update profil
+      if (!user?.name) {
+        await createProfile({
+          name: data.name,
+          birthday: data.birthday,
+          height: parseInt(data.height),
+          weight: parseInt(data.weight),
+          interests: data.interests || [],
+          gender: data.gender, // Menyertakan gender
+          zodiac: zodiac, // Menyertakan zodiac
+          horoscope: horoscope, // Menyertakan horoscope
+        });
+      } else {
+        await updateProfile({
+          name: data.name,
+          birthday: data.birthday,
+          height: parseInt(data.height),
+          weight: parseInt(data.weight),
+          interests: data.interests || null,
+          gender: data.gender, // Menyertakan gender
+          zodiac: zodiac, // Menyertakan zodiac
+          horoscope: horoscope, // Menyertakan horoscope
+        });
+      }
 
       setIsEditingAbout(false);
     } catch (error) {
@@ -173,7 +202,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#09141A] text-white px-2 relative">
+    <div className="h-screen min-h-fit flex flex-col bg-[#09141A] text-white px-2 relative">
       {loading && (
         <div className="absolute inset-0 flex justify-center items-center bg-black bg-opacity-30 z-50">
           <Loader /> {/* Komponen loader */}
@@ -195,15 +224,15 @@ export default function Profile() {
           </div>
         )}
         <div className="flex flex-col items-center justify-center flex-1">
-          {user && (
-            <h1 className="text-sm font-semibold">
-              @{user.username}
-            </h1>
-          )}
+          {user && <h1 className="text-sm font-semibold">@{user.username}</h1>}
         </div>
       </div>
-      <div className="h-40 relative bg-[#162329] rounded-lg p-4 mb-4">
-
+      <div className="relative min-h-40 bg-[#162329] rounded-lg p-3 mb-4">
+        {user && (
+          <h1 className="absolute bottom-2 left-3 text-xs font-semibold">
+            @{user.username} ,  {getAge(user.birthday)}
+          </h1>
+        )}
       </div>
       <div className="relative bg-[#0E191F] rounded-lg p-4 mb-4">
         <div className="flex items-center justify-between mb-4">
@@ -221,203 +250,209 @@ export default function Profile() {
         </div>
 
         {isEditingAbout ? (
-          <form onSubmit={handleSubmit(handleSaveAbout)} className="space-y-4">
+          <form
+            onSubmit={handleSubmit(handleSaveAbout)}
+            className="grid grid-cols-2 items-center gap-4"
+          >
             <button
               type="submit"
               className="absolute top-4 right-4 text-sm bg-gradient-to-r from-[#94783E] via-[#F3EDA6] via-[#F8FAE5] via-[#FFE2BE] to-[#D5BE88] bg-clip-text text-transparent font-medium"
             >
               Save & Update
             </button>
-            {/* Form fields */}
-            <div className="flex flex-row items-center justify-between">
+
+            {/* Display Name */}
+            <div className="flex flex-col justify-start">
               <Label
-                htmlFor="display"
+                htmlFor="name"
                 className="text-sm text-nowrap text-white/30"
               >
                 Display Name :
               </Label>
-              <div>
-                <Input
-                  {...register("name")}
-                  placeholder="Enter Name"
-                  className="bg-[#1A2B32] border border-[#30444E] rounded-md"
-                />
-                {errors.name && (
-                  <p className="text-red-500 text-sm">{errors.name.message}</p>
-                )}
-              </div>
             </div>
-            <div className="flex flex-row items-center justify-between">
+            <div className="flex flex-col justify-start">
+              <Input
+                {...register("name")}
+                placeholder="Enter Name"
+                className="bg-[#1A2B32] border border-[#30444E] rounded-md"
+              />
+              {errors.name && (
+                <p className="text-red-500 text-sm">{errors.name.message}</p>
+              )}
+            </div>
+
+            {/* Gender */}
+            <div className="flex flex-col justify-start">
               <Label
                 htmlFor="gender"
                 className="text-sm text-nowrap text-white/30"
               >
                 Gender :
               </Label>
-              <div>
-                <Popover open={open} onOpenChange={setOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={open}
-                      className="w-[200px] justify-between text-white bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
-                    >
-                      {value
-                        ? genders.find((gender) => gender.value === value)
-                            ?.label
-                        : "Select gender..."}
-                      <ChevronsUpDown className="opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[200px] p-0">
-                    <Command>
-                      <CommandInput
-                        placeholder="Search gender..."
-                        className="h-9"
-                      />
-                      <CommandList>
-                        <CommandEmpty>No gender found.</CommandEmpty>
-                        <CommandGroup>
-                          {genders.map((gender) => (
-                            <CommandItem
-                              key={gender.value}
-                              value={gender.value}
-                              onSelect={(currentValue) => {
-                                setValue(
-                                  currentValue === value ? "" : currentValue
-                                );
-                                setOpen(false);
-                              }}
-                            >
-                              {gender.label}
-                              <Check
-                                className={cn(
-                                  "ml-auto",
-                                  value === gender.value
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {errors.gender && (
-                  <p className="text-red-500 text-sm">
-                    {errors.gender.message}
-                  </p>
-                )}
-              </div>
+            </div>
+            <div className="flex flex-col justify-start">
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="w-full md:w-[200px] justify-between text-white bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
+                  >
+                    {value
+                      ? genders.find((gender) => gender.value === value)?.label
+                      : "Select gender..."}
+                    <ChevronsUpDown className="opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0">
+                  <Command>
+                    <CommandInput
+                      placeholder="Search gender..."
+                      className="h-9"
+                    />
+                    <CommandList>
+                      <CommandEmpty>No gender found.</CommandEmpty>
+                      <CommandGroup>
+                        {genders.map((gender) => (
+                          <CommandItem
+                            key={gender.value}
+                            value={gender.value}
+                            onSelect={(currentValue) => {
+                              setValue(
+                                currentValue === value ? "" : currentValue
+                              );
+                              setOpen(false);
+                            }}
+                          >
+                            {gender.label}
+                            <Check
+                              className={cn(
+                                "ml-auto",
+                                value === gender.value
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {errors.gender && (
+                <p className="text-red-500 text-sm">{errors.gender.message}</p>
+              )}
             </div>
 
             {/* Birthday */}
-            <div className="flex flex-row items-center justify-between">
+            <div className="flex flex-col justify-start">
               <Label
                 htmlFor="birthday"
                 className="text-sm text-nowrap text-white/30"
               >
                 Birthday :
               </Label>
-              <div>
-                <Input
-                  {...register("birthday")}
-                  placeholder="DD MM YYYY"
-                  className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
-                />
-                {errors.birthday && (
-                  <p className="text-red-500 text-sm">
-                    {errors.birthday.message}
-                  </p>
-                )}
-              </div>
+            </div>
+            <div className="flex flex-col justify-start">
+              <Input
+                {...register("birthday")}
+                placeholder="DD MM YYYY"
+                className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
+              />
+              {errors.birthday && (
+                <p className="text-red-500 text-sm">
+                  {errors.birthday.message}
+                </p>
+              )}
             </div>
 
             {/* Zodiac */}
-            <div className="flex flex-row items-center justify-between">
+            <div className="flex flex-col justify-start">
               <Label
                 htmlFor="zodiac"
                 className="text-sm text-nowrap text-white/30"
               >
                 Zodiac :
               </Label>
-              <div>
-                <Input
-                  {...register("zodiac")}
-                  placeholder="--"
-                  disabled
-                  className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
-                />
-              </div>
+            </div>
+            <div className="flex flex-col justify-start">
+              <Input
+                {...register("zodiac")}
+                placeholder="--"
+                disabled
+                className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
+              />
             </div>
 
             {/* Horoscope */}
-            <div className="flex flex-row items-center justify-between">
+            <div className="flex flex-col justify-start">
               <Label
                 htmlFor="horoscope"
                 className="text-sm text-nowrap text-white/30"
               >
                 Horoscope :
               </Label>
-              <div>
-                <Input
-                  {...register("horoscope")}
-                  placeholder="--"
-                  disabled
-                  className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
-                />
-              </div>
+            </div>
+            <div className="flex flex-col justify-start">
+              <Input
+                {...register("horoscope")}
+                placeholder="--"
+                disabled
+                className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
+              />
             </div>
 
             {/* Height */}
-            <div className="flex flex-row items-center justify-between">
+            <div className="flex flex-col justify-start">
               <Label
                 htmlFor="height"
                 className="text-sm text-nowrap text-white/30"
               >
                 Height :
               </Label>
-              <div>
-                <Input
-                  {...register("height")}
-                  placeholder="Add height"
-                  className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
-                />
-                {errors.height && (
-                  <p className="text-red-500 text-sm">
-                    {errors.height.message}
-                  </p>
-                )}
-              </div>
+            </div>
+            <div className="flex flex-col justify-start">
+              <Input
+                {...register("height")}
+                placeholder="Add height"
+                className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
+              />
+              {errors.height && (
+                <p className="text-red-500 text-sm">{errors.height.message}</p>
+              )}
             </div>
 
             {/* Weight */}
-            <div className="flex flex-row items-center justify-between">
+            <div className="flex flex-col justify-start">
               <Label
                 htmlFor="weight"
                 className="text-sm text-nowrap text-white/30"
               >
                 Weight :
               </Label>
-              <div>
-                <Input
-                  {...register("weight")}
-                  placeholder="Add weight"
-                  className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
-                />
-                {errors.weight && (
-                  <p className="text-red-500 text-sm">
-                    {errors.weight.message}
-                  </p>
-                )}
-              </div>
             </div>
-
+            <div className="flex flex-col justify-start">
+              <Input
+                {...register("weight")}
+                placeholder="Add weight"
+                className="bg-[#1A2B32] border border-[#30444E] rounded-md px-4"
+              />
+              {errors.weight && (
+                <p className="text-red-500 text-sm">{errors.weight.message}</p>
+              )}
+            </div>
             {/* Interests */}
-            <div>
+            <div className="flex flex-col justify-start col-span-2">
+              <Label
+                htmlFor="interests"
+                className="text-sm text-nowrap text-white/30"
+              >
+                Interests :
+              </Label>
+            </div>
+            <div className="flex flex-col justify-start col-span-2">
               <Input
                 {...register("interests")}
                 placeholder="Interests (comma-separated)"
@@ -431,21 +466,72 @@ export default function Profile() {
             </div>
           </form>
         ) : (
-          <div className="flex flex-col">
-            <span className="text-white/50">Name: {user?.name || "N/A"}</span>
-            <span className="text-white/50">Birthday: {user?.birthday || "N/A"}</span>
-            <span className="text-white/50">Zodiac: {user?.zodiac || "N/A"}</span>
-            <span className="text-white/50">
-              Horoscospane: {user?.horoscospane || "N/A"}
-            </span>
-            <span className="text-white/50">Gender: {user?.gender || "N/A"}</span>
-            <span className="text-white/50">Height: {user?.height || "N/A"} cm</span>
-            <span className="text-white/50">Weight: {user?.weight || "N/A"} kg</span>
-            <span className="text-white/50">
-              Interests: {user?.interests?.join(", ") || "N/A"}
-            </span>
+          <div>
+            {user?.name ? (
+              <div className="grid grid-cols-2 items-center gap-2 text-sm">
+                <span className="text-white/50">Name: </span>
+                <span className="text-white">{user?.name || "--"}</span>
+                <span className="text-white/50">Birthday: </span>
+                <span className="text-white">
+                  {user?.birthday
+                    ? `${user.birthday.replace(/ /g, " / ")} (Age ${getAge(
+                        user.birthday
+                      )})`
+                    : "--"}
+                </span>
+
+                <span className="text-white/50">Zodiac: </span>
+                <span className="text-white">{user?.zodiac || "--"}</span>
+                <span className="text-white/50">Horoscope: </span>
+                <span className="text-white">
+                  {user?.horoscope == "Error" ? "--" : user?.horoscope}
+                </span>
+                <span className="text-white/50">Gender: </span>
+                <span className="text-white">{user?.gender || "--"}</span>
+                <span className="text-white/50">Height: </span>
+                <span className="text-white">
+                  {user?.height || "--"} {"cm"}
+                </span>
+                <span className="text-white/50">Weight: </span>
+                <span className="text-white">
+                  {user?.weight || "--"} {"kg"}
+                </span>
+              </div>
+            ) : (
+              <span className="text-white/50 text-sm">
+                Add in your your to help others know you better
+              </span>
+            )}
           </div>
         )}
+      </div>
+      {/* Interest Section */}
+      <div className="relative bg-[#0E191F] rounded-lg p-4 mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold mb-1">Interest</h2>
+          <Link
+            className="flex items-center text-white cursor-pointer"
+            href="/profile/interest"
+          >
+            <BiEditAlt className="text-white cursor-pointer" />
+          </Link>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {user?.interests?.length > 0 ? (
+            user.interests.map((interest, index) => (
+              <span
+                key={index}
+                className="bg-white/10 text-white text-sm px-3 py-1 rounded-full"
+              >
+                {interest}
+              </span>
+            ))
+          ) : (
+            <span className="text-white/50 text-sm">
+              Add in your interest to find a better match
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

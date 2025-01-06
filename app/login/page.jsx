@@ -52,7 +52,7 @@ export default function Login() {
     !form.watch("email") || !form.watch("password") || isLoading;
 
   return (
-    <div className="relative h-screen w-screen bg-gradient-to-tr from-[#09141A] via-[#0D1D23] to-[#1F4247] text-white">
+    <div className="relative h-screen min-h-fit w-screen bg-gradient-to-tr from-[#09141A] via-[#0D1D23] to-[#1F4247] text-white">
       {isLoading && (
         <div className="absolute inset-0 flex justify-center items-center bg-black bg-opacity-30 z-50">
           <Loader /> {/* Komponen loader */}
